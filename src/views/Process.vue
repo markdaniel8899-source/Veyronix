@@ -587,20 +587,42 @@ const handleNewProject = async () => {
     formDataObj.append('simulation_requirement', pending.simulationRequirement)
     
     // ontology generate API
+    console.log('[Ontology] sending ontology request', {
+      files: pending.files.length,
+      requirement: pending.simulationRequirement
+    })
     const response = await generateOntology(formDataObj)
     
-    if (response.success) {
+    console.log('[Ontology] raw response:', response)
+    console.log('[Ontology] response type:', typeof response, '| keys:', response && typeof response === 'object' ? Object.keys(response) : response)
+    console.log('[Ontology] success flag:', response?.success)
+    
+    if (!response || typeof response !== 'object') {
+      throw new Error('The API returned an unexpected response: ' + JSON.stringify(response))
+    }
+    
+    if (response.success === true) {
+      // The API answers { success, data: { project_id, ontology, files, ... } }
+      const payload = response.data || {}
+      const ontology = payload.ontology || {}
+      const entityTypes = Array.isArray(ontology.entity_types) ? ontology.entity_types : []
+      const edgeTypes = Array.isArray(ontology.edge_types) ? ontology.edge_types : []
+      
+      console.log('[Ontology] project_id:', payload.project_id)
+      console.log('[Ontology] entity types:', entityTypes.length, '| edge types:', edgeTypes.length)
+      console.log('[Ontology] files:', Array.isArray(payload.files) ? payload.files.length : 0)
+      
       // upload data
       clearPendingUpload()
       
       // update project ID and data
-      currentProjectId.value = response.data.project_id
-      projectData.value = response.data
+      currentProjectId.value = payload.project_id
+      projectData.value = payload
       
       // update URL（refresh pages）
       router.replace({
         name: 'Process',
-        params: { projectId: response.data.project_id }
+        params: { projectId: payload.project_id }
       })
       
       ontologyProgress.value = null
@@ -608,11 +630,14 @@ const handleNewProject = async () => {
       // start graph building
       await startBuildGraph()
     } else {
-      error.value = response.error || 'ontology generate failed'
+      const reason = response.error || response.message || 'the API reported success=false'
+      console.error('[Ontology] generation failed:', reason, response)
+      error.value = `Ontology generation failed: ${reason}`
     }
   } catch (err) {
-    console.error('Handle new project error:', err)
-    error.value = 'project initialise failed: ' + (err.message || 'error')
+    console.error('[Ontology] exception while generating the ontology:', err)
+    const reason = err?.message || 'unknown error'
+    error.value = `Ontology generation failed: ${reason}`
   } finally {
     loading.value = false
   }

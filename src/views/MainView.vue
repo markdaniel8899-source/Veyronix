@@ -210,22 +210,45 @@ const handleNewProject = async () => {
     formData.append('simulation_requirement', pending.simulationRequirement)
     
     const res = await generateOntology(formData)
-    if (res.success) {
-      clearPendingUpload()
-      currentProjectId.value = res.data.project_id
-      projectData.value = res.data
+    
+    console.log('[Ontology] raw response:', res)
+    console.log('[Ontology] response type:', typeof res, '| keys:', res && typeof res === 'object' ? Object.keys(res) : res)
+    console.log('[Ontology] success flag:', res?.success)
+    
+    if (!res || typeof res !== 'object') {
+      throw new Error('The API returned an unexpected response: ' + JSON.stringify(res))
+    }
+    
+    if (res.success === true) {
+      // The API answers { success, data: { project_id, ontology, files, ... } }
+      const payload = res.data || {}
+      const ontology = payload.ontology || {}
+      const entityTypes = Array.isArray(ontology.entity_types) ? ontology.entity_types : []
+      const edgeTypes = Array.isArray(ontology.edge_types) ? ontology.edge_types : []
       
-      router.replace({ name: 'Process', params: { projectId: res.data.project_id } })
+      console.log('[Ontology] project_id:', payload.project_id)
+      console.log('[Ontology] entity types:', entityTypes.length, '| edge types:', edgeTypes.length)
+      console.log('[Ontology] files:', Array.isArray(payload.files) ? payload.files.length : 0)
+      
+      clearPendingUpload()
+      currentProjectId.value = payload.project_id
+      projectData.value = payload
+      
+      router.replace({ name: 'Process', params: { projectId: payload.project_id } })
       ontologyProgress.value = null
-      addLog(`Ontology generated successfully for project ${res.data.project_id}`)
+      addLog(`Ontology generated successfully for project ${payload.project_id}`)
       await startBuildGraph()
     } else {
-      error.value = res.error || 'Ontology generation failed'
-      addLog(`Error generating ontology: ${error.value}`)
+      const reason = res.error || res.message || 'the API reported success=false'
+      console.error('[Ontology] generation failed:', reason, res)
+      error.value = `Ontology generation failed: ${reason}`
+      addLog(`Error generating ontology: ${reason}`)
     }
   } catch (err) {
-    error.value = err.message
-    addLog(`Exception in handleNewProject: ${err.message}`)
+    console.error('[Ontology] exception while generating the ontology:', err)
+    const reason = err?.message || 'unknown error'
+    error.value = `Ontology generation failed: ${reason}`
+    addLog(`Exception in handleNewProject: ${reason}`)
   } finally {
     loading.value = false
   }

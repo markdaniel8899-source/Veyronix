@@ -1,4 +1,4 @@
-import service from './index'
+import service, { API_TIMEOUT_MS } from './index'
 
 /**
  * generate ontology（upload documents and simulation requirement）
@@ -6,13 +6,21 @@ import service from './index'
  * @returns {Promise}
  */
 export function generateOntology(formData) {
+  // Content-Type is deliberately NOT set here: the browser has to add the
+  // multipart boundary itself, otherwise the backend cannot parse the files.
+  console.log(
+    '[API] -> POST /api/graph/ontology/generate',
+    {
+      files: formData?.getAll?.('files')?.length ?? 0,
+      simulation_requirement: formData?.get?.('simulation_requirement') ?? null
+    }
+  );
+
   return service({
     url: '/api/graph/ontology/generate',
     method: 'post',
     data: formData,
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
+    timeout: API_TIMEOUT_MS
   })
 }
 
