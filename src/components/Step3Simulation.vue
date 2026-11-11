@@ -91,9 +91,36 @@
       </div>
 
       <div class="action-controls">
+        <!-- 5 step workflow gate: the report unlocks when every step is done -->
+        <div class="report-gate" :class="{ ready: allStepsComplete }">
+          <div class="report-gate__head">
+            <span class="report-gate__title">{{ t('step3.reportGateTitle') }}</span>
+            <span class="report-gate__count">{{ t('step3.reportGateProgress', { completed: completedStepCount, total: workflowSteps.length }) }}</span>
+          </div>
+          <ul class="report-gate__steps">
+            <li
+              v-for="step in workflowSteps"
+              :key="step.key"
+              class="report-gate__step"
+              :class="step.status"
+            >
+              <span class="report-gate__dot"></span>
+              <span class="report-gate__label">{{ step.label }}</span>
+              <span class="report-gate__state">
+                {{ step.status === 'completed' ? t('step3.stepStateCompleted') : t('step3.stepStatePending') }}
+              </span>
+            </li>
+          </ul>
+          <p v-if="!allStepsComplete" class="report-gate__hint" :title="t('step3.reportGateTooltip')">
+            {{ t('step3.reportGateTooltip') }}
+          </p>
+        </div>
+
         <button 
           class="action-btn primary"
-          :disabled="phase !== 2 || isGeneratingReport"
+          :class="{ ready: allStepsComplete }"
+          :disabled="reportButtonDisabled"
+          :title="reportButtonDisabled && !isGeneratingReport ? t('step3.reportGateTooltip') : ''"
           @click="handleNextStep"
         >
           <span v-if="isGeneratingReport" class="loading-spinner-small"></span>
@@ -293,7 +320,8 @@ import {
   startSimulation,
   stopSimulation,
   getRunStatus,
-  getRunStatusDetail
+  getRunStatusDetail,
+  getSimulation
 } from '../api/simulation'
 import { generateReport } from '../api/report'
 
@@ -325,6 +353,10 @@ const runStatus = ref({})
 const allActions = ref([]) // all action（Incremental Cumulative）
 const actionIds = ref(new Set()) // For deduplication of action ID collection
 const scrollContainer = ref(null)
+// Simulation metadata (entity count, report id) used by the report step gate.
+const simulationInfo = ref(null)
+// True only when the simulation reached a successful terminal state.
+const simulationCompleted = ref(false)
 
 // Computed
 // by time sequential show action（latest of in most Behind，i.e. bottom）
@@ -360,6 +392,73 @@ const redditElapsedTime = computed(() => {
   return formatElapsedTime(runStatus.value.reddit_current_round || 0)
 })
 
+// ===== Report step gate =================================================
+// The report can only be generated when every prerequisite of the 5 step
+// workflow is done: ontology -> graph -> entities -> simulation.
+// The 5th step ("Report Ready") is the outcome of pressing the button.
+const fetchSimulationInfo = async () => {
+  if (!props.simulationId) return
+  try {
+    const res = await getSimulation(props.simulationId)
+    if (res.success && res.data) {
+      simulationInfo.value = res.data
+    }
+  } catch (err) {
+    console.warn('failed to load simulation info for the report gate:', err)
+  }
+}
+
+const workflowSteps = computed(() => {
+  const info = simulationInfo.value || {}
+  const ontology = props.projectData?.ontology
+  const ontologyTypes = Array.isArray(ontology?.entity_types) ? ontology.entity_types : []
+  const hasGraph = Boolean(props.projectData?.graph_id) || Boolean(props.graphData?.nodes?.length)
+  const entityCount = info.entities_count || info.profiles_count || 0
+  const hasReport = Boolean(info.report_id)
+
+  return [
+    {
+      key: 'ontology',
+      label: t('step3.stepOntology'),
+      status: ontologyTypes.length > 0 ? 'completed' : 'pending'
+    },
+    {
+      key: 'graph',
+      label: t('step3.stepGraph'),
+      status: hasGraph ? 'completed' : 'pending'
+    },
+    {
+      key: 'entities',
+      label: t('step3.stepEntities'),
+      status: entityCount > 0 ? 'completed' : 'pending'
+    },
+    {
+      key: 'simulation',
+      label: t('step3.stepSimulation'),
+      status: simulationCompleted.value ? 'completed' : 'pending'
+    },
+    {
+      key: 'report',
+      label: t('step3.stepReport'),
+      status: hasReport ? 'completed' : 'pending'
+    }
+  ]
+})
+
+const completedStepCount = computed(() => {
+  return workflowSteps.value.filter((step) => step.status === 'completed').length
+})
+
+// The button unlocks once every step that can be completed before the report
+// exists is done (the 5th step is produced by this very button).
+const allStepsComplete = computed(() => {
+  return completedStepCount.value >= workflowSteps.value.length - 1
+})
+
+const reportButtonDisabled = computed(() => {
+  return isGeneratingReport.value || !allStepsComplete.value
+})
+
 // Methods
 const addLog = (msg) => {
   emit('add-log', msg)
@@ -376,6 +475,7 @@ const resetAllState = () => {
   startError.value = null
   isStarting.value = false
   isStopping.value = false
+  simulationCompleted.value = false
   stopPolling()  // save possibly in of rounds query before stop
 }
 
@@ -450,7 +550,9 @@ const handleStopSimulation = async () => {
     if (res.success) {
       addLog(t('log.simStoppedSuccess'))
       phase.value = 2
+      simulationCompleted.value = true
       stopPolling()
+      fetchSimulationInfo()
       emit('update-status', 'completed')
     } else {
       addLog(t('log.stopFailed', { error: res.error || t('common.unknownError') }))
@@ -525,7 +627,9 @@ const fetchRunStatus = async () => {
       } else if (isCompleted) {
         addLog(t('log.simCompleted'))
         phase.value = 2
+        simulationCompleted.value = true
         stopPolling()
+        fetchSimulationInfo()
         emit('update-status', 'completed')
       }
     }
@@ -691,6 +795,7 @@ watch(() => props.systemLogs?.length, () => {
 onMounted(() => {
   addLog(t('log.step3Init'))
   if (props.simulationId) {
+    fetchSimulationInfo()
     doStartSimulation()
   }
 })
@@ -900,6 +1005,107 @@ onUnmounted(() => {
 .action-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+/* Report step gate */
+.report-gate {
+  min-width: 260px;
+  max-width: 340px;
+  padding: 10px 14px;
+  border: 1px solid #E5E7EB;
+  background: #F9FAFB;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.report-gate.ready {
+  border-color: #10B981;
+  background: #ECFDF5;
+}
+
+.report-gate__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.report-gate__title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #374151;
+}
+
+.report-gate__count {
+  font-size: 10px;
+  color: #6B7280;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-gate__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.report-gate__step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #9CA3AF;
+}
+
+.report-gate__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #D1D5DB;
+  flex-shrink: 0;
+}
+
+.report-gate__label {
+  flex: 1;
+}
+
+.report-gate__state {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9CA3AF;
+}
+
+.report-gate__step.completed {
+  color: #047857;
+}
+
+.report-gate__step.completed .report-gate__dot {
+  background: #10B981;
+}
+
+.report-gate__step.completed .report-gate__state {
+  color: #059669;
+}
+
+.report-gate__hint {
+  margin: 8px 0 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #9CA3AF;
+  cursor: help;
+}
+
+.action-btn.primary.ready {
+  background: #059669;
+}
+
+.action-btn.primary.ready:hover:not(:disabled) {
+  background: #047857;
 }
 
 /* --- Main Content Area --- */

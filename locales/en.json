@@ -205,7 +205,18 @@
     "forceStopSuccess": "Simulation force stopped",
     "forceStopFailed": "Force stop failed: {error}",
     "startGenerateReportBtn": "Generate Report",
-    "generatingReportBtn": "Starting..."
+    "generatingReportBtn": "Starting...",
+    "reportGateTitle": "Report prerequisites",
+    "reportGateTooltip": "Complete all 5 steps to generate report",
+    "reportGateProgress": "{completed}/{total} steps complete",
+    "reportGateWaiting": "Complete every step below to unlock the report.",
+    "stepOntology": "Ontology Generation",
+    "stepGraph": "GraphRAG Build",
+    "stepEntities": "Entity Generation",
+    "stepSimulation": "Run Simulation",
+    "stepReport": "Report Ready",
+    "stepStateCompleted": "Completed",
+    "stepStatePending": "Pending"
   },
   "step4": {
     "generatingSection": "Generating {title}...",
