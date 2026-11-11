@@ -249,6 +249,20 @@
     "world1": "World 1",
     "world2": "World 2"
   },
+  "domainCheck": {
+    "eyebrow": "Launch Check",
+    "title": "Domain Availability",
+    "hint": "Check whether the suggested SaaS product name has a free domain.",
+    "suggested": "Suggested",
+    "placeholder": "product name or example.com",
+    "check": "Check domain",
+    "checking": "Checking...",
+    "checkingShort": "Checking",
+    "available": "Available",
+    "taken": "Taken",
+    "unknown": "Unverified",
+    "note": "Availability is checked against public RDAP records with a DNS fallback. Always confirm with a registrar before purchase."
+  },
   "step5": {
     "interactiveTools": "Interactive Tools",
     "agentsAvailable": "{count} agents available",

@@ -16,6 +16,11 @@
             <div class="header-divider"></div>
           </div>
 
+          <DomainAvailability
+            :title="reportOutline.title"
+            :content="reportPlainText"
+          />
+
           <!-- Sections List -->
           <div class="sections-list">
             <div 
@@ -394,6 +399,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick, h, reactive } f
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getAgentLog, getConsoleLog } from '../api/report'
+import DomainAvailability from './DomainAvailability.vue'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -430,6 +436,10 @@ const leftPanel = ref(null)
 const rightPanel = ref(null)
 const logContent = ref(null)
 const showRawResult = reactive({})
+
+const reportPlainText = computed(() =>
+  Object.values(generatedSections.value).join('\n\n')
+)
 
 // Toggle functions
 const toggleRawResult = (timestamp, event) => {
