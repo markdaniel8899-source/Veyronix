@@ -21,6 +21,14 @@
       </div>
 
       <div class="header-right">
+        <button class="download-btn" @click="downloadReport" title="Download Report">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Download Report</span>
+        </button>
         <LanguageSwitcher />
         <div class="step-divider"></div>
         <div class="workflow-step">
@@ -203,6 +211,31 @@ const refreshGraph = () => {
   }
 }
 
+// Download report as PDF
+const downloadReport = () => {
+  const element = document.querySelector('.report-panel')
+  if (!element) return
+
+  const opt = {
+    margin: [10, 10],
+    filename: `veyronix-report-${currentReportId.value}.pdf`,
+    image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: { 
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      letterRendering: true,
+    },
+    jsPDF: { 
+      unit: 'mm', 
+      format: 'a4', 
+      orientation: 'portrait' 
+    },
+  }
+
+  html2pdf().set(opt).from(element).save()
+}
+
 // Watch route params
 watch(() => route.params.reportId, (newId) => {
   if (newId && newId !== currentReportId.value) {
@@ -331,6 +364,33 @@ onMounted(() => {
 .status-indicator.error .dot { background: #F44336; }
 
 @keyframes pulse { 50% { opacity: 0.5; } }
+
+/* Download Button */
+.download-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #000;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.download-btn:hover {
+  background: #333;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.download-btn:active {
+  transform: scale(0.98);
+}
 
 /* Content */
 .content-area {

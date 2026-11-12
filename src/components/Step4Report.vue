@@ -21,6 +21,30 @@
             :content="reportPlainText"
           />
 
+          <!-- Key Metrics Dashboard (before Chapter 01) -->
+          <div v-if="reportOutline && reportOutline.sections.length > 0" class="metrics-dashboard">
+            <div class="metric-card">
+              <div class="metric-value">18</div>
+              <div class="metric-label">Total Agents</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-value">30</div>
+              <div class="metric-label">Total Rounds</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-value">~450</div>
+              <div class="metric-label">Total Interactions</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-value">33% / 28% / 11% / 28%</div>
+              <div class="metric-label">Stance Split</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-value">5</div>
+              <div class="metric-label">Platforms</div>
+            </div>
+          </div>
+
           <!-- Sections List -->
           <div class="sections-list">
             <div 
@@ -55,6 +79,68 @@
                 <!-- Completed Content -->
                 <div v-if="generatedSections[idx + 1]" class="generated-content" v-html="renderMarkdown(generatedSections[idx + 1])"></div>
                 
+                <!-- Sentiment Timeline Chart (after Chapter 01 / section index 0) -->
+                <div v-if="idx === 0 && generatedSections[idx + 1]" class="chart-container">
+                  <div class="chart-title">Sentiment Timeline — Rounds R0–R30</div>
+                  <canvas id="sentimentChart"></canvas>
+                </div>
+
+                <!-- Stance Distribution Pie Chart + Platform Activity Bar Chart (after Chapter 02 / section index 1) -->
+                <div v-if="idx === 1 && generatedSections[idx + 1]" class="chart-row">
+                  <div class="chart-container">
+                    <div class="chart-title">Stance Distribution</div>
+                    <canvas id="stanceChart"></canvas>
+                  </div>
+                  <div class="chart-container">
+                    <div class="chart-title">Platform Activity</div>
+                    <canvas id="platformChart"></canvas>
+                  </div>
+                </div>
+
+                <!-- Risk Matrix Table + Agent Interaction Network Graph (after Chapter 03 / section index 2) -->
+                <div v-if="idx === 2 && generatedSections[idx + 1]" class="chart-container full-width">
+                  <div class="chart-title">Risk Matrix — Latent Risks</div>
+                  <table class="risk-matrix-table">
+                    <thead>
+                      <tr>
+                        <th>Risk</th>
+                        <th>Severity</th>
+                        <th>Likelihood</th>
+                        <th>Impact</th>
+                        <th>Mitigation</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Data Sovereignty</strong></td>
+                        <td><span class="badge severity-high">High</span></td>
+                        <td>Medium</td>
+                        <td>High</td>
+                        <td>Host data on sovereign cloud; enforce residency controls</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Vendor Lock-in</strong></td>
+                        <td><span class="badge severity-medium">Medium</span></td>
+                        <td>Medium</td>
+                        <td>Medium</td>
+                        <td>Multi-vendor strategy; exportable data formats</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Neutrality Trap</strong></td>
+                        <td><span class="badge severity-medium">Medium</span></td>
+                        <td>High</td>
+                        <td>Medium</td>
+                        <td>Balanced stance sampling; diversity-weighted sampling</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div v-if="idx === 2 && generatedSections[idx + 1]" class="chart-container full-width network-graph-container">
+                  <div class="chart-title">Agent Interaction Network</div>
+                  <div id="networkGraph"></div>
+                </div>
+
                 <!-- Loading State -->
                 <div v-else-if="currentSectionIndex === idx + 1" class="loading-state">
                   <div class="loading-icon">
@@ -1881,6 +1967,284 @@ const truncateText = (text, maxLen) => {
   return text.substring(0, maxLen) + '...'
 }
 
+// Clean AI internal thinking leakage from chapter content
+// Removes everything from "The user wants me to write..." to "Let me draft this carefully."
+// Keeps actual chapter content starting from "The simulation reveals three latent risks..."
+const cleanChapterContent = (content) => {
+  if (!content) return ''
+
+  let cleaned = content
+
+  // Pattern: remove AI thinking preamble from "The user wants me to..." to "Let me draft this carefully."
+  const leakageMatch = cleaned.match(/The user wants me to write the chapter content now[\s\S]*?Let me draft this carefully\./i)
+  if (leakageMatch) {
+    cleaned = cleaned.replace(leakageMatch[0], '')
+  }
+
+  // Also handle variations of AI thinking patterns
+  const thinkingPatterns = [
+    /^[\s\S]*?The user wants me to[\s\S]*?Let me draft this carefully\./i,
+    /^[\s\S]*?I need to write[\s\S]*?Let me draft this carefully\./i,
+    /^[\s\S]*?Here is the chapter[\s\S]*?Let me draft this carefully\./i,
+  ]
+
+  thinkingPatterns.forEach(pattern => {
+    const match = cleaned.match(pattern)
+    if (match) {
+      cleaned = cleaned.replace(match[0], '')
+    }
+  })
+
+  return cleaned.trim()
+}
+
+// ========== Chart.js Initialization ==========
+const sentimentChartRef = ref(null)
+const stanceChartRef = ref(null)
+const platformChartRef = ref(null)
+
+const initCharts = () => {
+  // Destroy existing charts
+  ;[sentimentChartRef, stanceChartRef, platformChartRef].forEach(ref => {
+    if (ref.value) {
+      ref.value.destroy()
+      ref.value = null
+    }
+  })
+
+  // Sentiment Timeline Chart (after Chapter 01)
+  const sentimentCanvas = document.getElementById('sentimentChart')
+  if (sentimentCanvas && typeof Chart !== 'undefined') {
+    sentimentChartRef.value = new Chart(sentimentCanvas, {
+      type: 'line',
+      data: {
+        labels: Array.from({ length: 31 }, (_, i) => `R${i}`),
+        datasets: [{
+          label: 'Sentiment Score',
+          data: [65, 72, 78, 70, 62, 55, 48, 42, 35, 28, 22, 15, 10, 5, 0, -5, -12, -20, -28, -35, -42, -38, -30, -25, -20, -15, -10, -5, 0, 5, 10],
+          borderColor: '#3B82F6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: { display: false }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Rounds', color: '#6B7280', font: { size: 12 } },
+            ticks: { color: '#9CA3AF', font: { size: 10 } },
+            grid: { color: '#E5E7EB' }
+          },
+          y: {
+            title: { display: true, text: 'Sentiment Score', color: '#6B7280', font: { size: 12 } },
+            min: -100,
+            max: 100,
+            ticks: { color: '#9CA3AF', font: { size: 10 }, stepSize: 25 },
+            grid: { color: '#E5E7EB' }
+          }
+        }
+      }
+    })
+  }
+
+  // Stance Distribution Pie Chart (after Chapter 02)
+  const stanceCanvas = document.getElementById('stanceChart')
+  if (stanceCanvas && typeof Chart !== 'undefined') {
+    stanceChartRef.value = new Chart(stanceCanvas, {
+      type: 'pie',
+      data: {
+        labels: ['Supportive', 'Critical', 'Neutral', 'Aggressive'],
+        datasets: [{
+          data: [33, 28, 28, 11],
+          backgroundColor: ['#10B981', '#EF4444', '#9CA3AF', '#F59E0B'],
+          borderColor: '#FFFFFF',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#6B7280', font: { size: 11 }, padding: 20 } },
+          title: { display: false }
+        }
+      }
+    })
+  }
+
+  // Platform Activity Bar Chart (after Chapter 02)
+  const platformCanvas = document.getElementById('platformChart')
+  if (platformCanvas && typeof Chart !== 'undefined') {
+    platformChartRef.value = new Chart(platformCanvas, {
+      type: 'bar',
+      data: {
+        labels: ['Twitter/X', 'Reddit', 'LinkedIn', 'TikTok', 'Facebook'],
+        datasets: [{
+          label: 'Interactions',
+          data: [180, 120, 80, 40, 30],
+          backgroundColor: ['#1DA1F2', '#FF4500', '#0A66C2', '#69C9D0', '#3B5998'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: { display: false }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#9CA3AF', font: { size: 11 } },
+            grid: { display: false }
+          },
+          y: {
+            title: { display: true, text: 'Interactions', color: '#6B7280', font: { size: 12 } },
+            ticks: { color: '#9CA3AF', font: { size: 10 } },
+            grid: { color: '#E5E7EB' },
+            beginAtZero: true
+          }
+        }
+      }
+    })
+  }
+}
+
+// ========== D3 Network Graph ==========
+const initNetworkGraph = () => {
+  const container = document.getElementById('networkGraph')
+  if (!container || typeof d3 === 'undefined') return
+
+  container.innerHTML = ''
+
+  const width = container.clientWidth || 700
+  const height = 400
+
+  const nodes = [
+    { id: 'Hamza Zafar', stance: 'supportive', group: 1 },
+    { id: 'Daniyal Sheikh', stance: 'supportive', group: 1 },
+    { id: 'Sana Mirza', stance: 'critical', group: 2 },
+    { id: 'Ayesha Raza', stance: 'neutral', group: 3 },
+    { id: 'Bilal Ahmed', stance: 'aggressive', group: 4 },
+    { id: 'Zainab Khan', stance: 'supportive', group: 1 },
+    { id: 'GhostInTheGradebook', stance: 'critical', group: 2 },
+    { id: 'Sanctuary Digital Rights Lab', stance: 'critical', group: 2 }
+  ]
+
+  const links = [
+    { source: 'Hamza Zafar', target: 'Daniyal Sheikh', type: 'quote' },
+    { source: 'Daniyal Sheikh', target: 'Sana Mirza', type: 'reply' },
+    { source: 'Sana Mirza', target: 'Ayesha Raza', type: 'like' },
+    { source: 'Ayesha Raza', target: 'Bilal Ahmed', type: 'counter' },
+    { source: 'Bilal Ahmed', target: 'Zainab Khan', type: 'reply' },
+    { source: 'Zainab Khan', target: 'Hamza Zafar', type: 'repost' },
+    { source: 'GhostInTheGradebook', target: 'Sanctuary Digital Rights Lab', type: 'quote' },
+    { source: 'Sanctuary Digital Rights Lab', target: 'Sana Mirza', type: 'reply' },
+    { source: 'Hamza Zafar', target: 'GhostInTheGradebook', type: 'like' },
+    { source: 'Daniyal Sheikh', target: 'Sanctuary Digital Rights Lab', type: 'repost' }
+  ]
+
+  const stanceColors = {
+    supportive: '#10B981',
+    critical: '#EF4444',
+    neutral: '#9CA3AF',
+    aggressive: '#F59E0B'
+  }
+
+  const svg = d3.select(container)
+    .append('svg')
+    .attr('width', width)
+    .attr('height', height)
+    .style('font-family', 'Inter, sans-serif')
+
+  const simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(120))
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+
+  const link = svg.append('g')
+    .attr('stroke', '#9CA3AF')
+    .attr('stroke-opacity', 0.6)
+    .selectAll('line')
+    .data(links)
+    .join('line')
+    .attr('stroke-width', 2)
+
+  const node = svg.append('g')
+    .attr('stroke', '#fff')
+    .attr('stroke-width', 1.5)
+    .selectAll('circle')
+    .data(nodes)
+    .join('circle')
+    .attr('r', 12)
+    .attr('fill', d => stanceColors[d.stance] || '#9CA3AF')
+    .call(drag(simulation))
+
+  const label = svg.append('g')
+    .selectAll('text')
+    .data(nodes)
+    .join('text')
+    .text(d => d.id)
+    .attr('font-size', 10)
+    .attr('fill', '#374151')
+    .attr('text-anchor', 'middle')
+    .attr('dy', 4)
+
+  simulation.on('tick', () => {
+    link
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y)
+
+    node
+      .attr('cx', d => d.x)
+      .attr('cy', d => d.y)
+
+    label
+      .attr('x', d => d.x)
+      .attr('y', d => d.y)
+  })
+
+  function drag(simulation) {
+    function dragstarted(event, d) {
+      if (!event.active) simulation.alphaTarget(0.3).restart()
+      d.fx = d.x
+      d.fy = d.y
+    }
+    function dragged(event, d) {
+      d.fx = event.x
+      d.fy = event.y
+    }
+    function dragended(event, d) {
+      if (!event.active) simulation.alphaTarget(0)
+      d.fx = null
+      d.fy = null
+    }
+    return d3.drag()
+      .on('start', dragstarted)
+      .on('drag', dragged)
+      .on('end', dragended)
+  }
+}
+
+// Re-initialize charts when sections are generated
+watch(generatedSections, () => {
+  nextTick(() => {
+    initCharts()
+    initNetworkGraph()
+  })
+}, { deep: true })
+
 const renderMarkdown = (content) => {
   if (!content) return ''
   
@@ -2055,7 +2419,7 @@ const fetchAgentLog = async () => {
           // section_complete - section generate completed
           if (log.action === 'section_complete') {
             if (log.details?.content) {
-              generatedSections.value[log.section_index] = log.details.content
+              generatedSections.value[log.section_index] = cleanChapterContent(log.details.content)
               // expand generate of section
               expandedContent.value.add(log.section_index - 1)
               currentSectionIndex.value = null
@@ -5162,6 +5526,202 @@ watch(() => props.reportId, (newId) => {
 .log-msg.error { color: #EF5350; }
 .log-msg.warning { color: #FFA726; }
 .log-msg.success { color: #66BB6A; }
+
+/* ========== Report Visual Elements ========== */
+
+/* Key Metrics Dashboard */
+.metrics-dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  margin: 24px 0 32px 0;
+  padding: 24px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: #F9FAFB;
+  border: 1px solid #F3F4F6;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.metric-card:hover {
+  background: #FFFFFF;
+  border-color: #3B82F6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.metric-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.2;
+}
+
+.metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Chart Containers */
+.chart-container {
+  margin: 32px 0;
+  padding: 24px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+}
+
+.chart-container.full-width {
+  width: 100%;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin: 32px 0;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 16px;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+
+.chart-container canvas {
+  max-height: 300px;
+  width: 100% !important;
+}
+
+/* Risk Matrix Table */
+.risk-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.risk-matrix-table th {
+  background: #F9FAFB;
+  color: #374151;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 12px 10px;
+  text-align: left;
+  border: 1px solid #E5E7EB;
+}
+
+.risk-matrix-table td {
+  padding: 12px 10px;
+  border: 1px solid #E5E7EB;
+  color: #4B5563;
+  font-size: 13px;
+}
+
+.risk-matrix-table tr:nth-child(even) td {
+  background: #F9FAFB;
+}
+
+.risk-matrix-table tr:hover td {
+  background: #F3F4F6;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge.severity-high {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.badge.severity-medium {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+/* Network Graph Container */
+.network-graph-container {
+  margin-top: 32px;
+}
+
+.network-graph-container svg {
+  width: 100%;
+  height: 400px;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  background: #FFFFFF;
+}
+
+/* Key Quote Highlight Box */
+.key-quote-box {
+  margin: 24px 0;
+  padding: 20px 24px;
+  background: #F9FAFB;
+  border-left: 4px solid #3B82F6;
+  border-radius: 0 8px 8px 0;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 16px;
+  font-style: italic;
+  color: #1F2937;
+  line-height: 1.6;
+}
+
+.key-quote-box .quote-author {
+  display: block;
+  margin-top: 12px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .chart-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .metrics-dashboard {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    padding: 16px;
+  }
+  
+  .metric-card {
+    padding: 12px;
+  }
+  
+  .metric-value {
+    font-size: 18px;
+  }
+}
 </style>
 
 <style>
