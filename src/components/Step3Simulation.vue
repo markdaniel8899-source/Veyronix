@@ -395,13 +395,19 @@ const redditElapsedTime = computed(() => {
 // ===== Report step gate =================================================
 // The report can only be generated when every prerequisite of the 5 step
 // workflow is done: ontology -> graph -> entities -> simulation.
-// The 5th step ("Report Ready") is the outcome of pressing the button.
+// "Report Ready" turns Completed once those four prerequisites are done,
+// which is exactly when the button unlocks.
 const fetchSimulationInfo = async () => {
   if (!props.simulationId) return
   try {
     const res = await getSimulation(props.simulationId)
     if (res.success && res.data) {
       simulationInfo.value = res.data
+      // Re-entering Step 3 after a finished run must not lock the report
+      // again: the backend status is the source of truth, not local state.
+      if (res.data.status === 'completed') {
+        simulationCompleted.value = true
+      }
     }
   } catch (err) {
     console.warn('failed to load simulation info for the report gate:', err)
@@ -414,7 +420,13 @@ const workflowSteps = computed(() => {
   const ontologyTypes = Array.isArray(ontology?.entity_types) ? ontology.entity_types : []
   const hasGraph = Boolean(props.projectData?.graph_id) || Boolean(props.graphData?.nodes?.length)
   const entityCount = info.entities_count || info.profiles_count || 0
-  const hasReport = Boolean(info.report_id)
+
+  const prerequisitesComplete = (
+    ontologyTypes.length > 0 &&
+    hasGraph &&
+    entityCount > 0 &&
+    simulationCompleted.value
+  )
 
   return [
     {
@@ -440,7 +452,10 @@ const workflowSteps = computed(() => {
     {
       key: 'report',
       label: t('step3.stepReport'),
-      status: hasReport ? 'completed' : 'pending'
+      // "Report Ready" means the report prerequisites are satisfied. The
+      // report file itself is produced by the button, so requiring an
+      // existing report here would deadlock the button forever.
+      status: prerequisitesComplete ? 'completed' : 'pending'
     }
   ]
 })
@@ -449,10 +464,10 @@ const completedStepCount = computed(() => {
   return workflowSteps.value.filter((step) => step.status === 'completed').length
 })
 
-// The button unlocks once every step that can be completed before the report
-// exists is done (the 5th step is produced by this very button).
+// Every one of the five steps must show Completed before the button unlocks.
+// The fifth step is the readiness check, not the generated report file.
 const allStepsComplete = computed(() => {
-  return completedStepCount.value >= workflowSteps.value.length - 1
+  return workflowSteps.value.every((step) => step.status === 'completed')
 })
 
 const reportButtonDisabled = computed(() => {
