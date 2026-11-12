@@ -4,10 +4,6 @@
     <nav class="navbar">
       <div class="nav-brand">Veyronix</div>
       <div class="nav-links">
-        <LanguageSwitcher />
-        <a href="https://github.com/666ghj/Veyronix" target="_blank" class="github-link">
-          {{ $t('nav.visitGithub') }} <span class="arrow">↗</span>
-        </a>
       </div>
     </nav>
 
@@ -214,7 +210,6 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
-import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 
 const router = useRouter()
 
