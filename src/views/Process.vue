@@ -258,6 +258,20 @@
                   <span class="progress-text">{{ ontologyProgress.message }}</span>
                 </div>
               </div>
+
+              <!-- per-file extraction warnings -->
+              <div class="detail-section" v-if="uploadWarnings.length">
+                <div class="detail-label">upload warnings ({{ uploadWarnings.length }})</div>
+                <div class="upload-warning-list">
+                  <div
+                    v-for="item in uploadWarnings"
+                    :key="item.filename"
+                    class="upload-warning-item"
+                  >
+                    <strong>{{ item.filename }}</strong>: {{ item.error }}
+                  </div>
+                </div>
+              </div>
               
               <!-- generate of ontology information -->
               <div class="detail-section" v-if="projectData?.ontology">
@@ -428,6 +442,7 @@ const currentProjectId = ref(route.params.projectId)
 const loading = ref(true)
 const graphLoading = ref(false)
 const error = ref('')
+const uploadWarnings = ref([])
 const projectData = ref(null)
 const graphData = ref(null)
 const buildProgress = ref(null)
@@ -576,6 +591,8 @@ const handleNewProject = async () => {
   
   try {
     loading.value = true
+    error.value = ''
+    uploadWarnings.value = []
     currentPhase.value = 0 // ontology generate stage
     ontologyProgress.value = { message: 'in upload file...' }
     
@@ -611,6 +628,11 @@ const handleNewProject = async () => {
       console.log('[Ontology] project_id:', payload.project_id)
       console.log('[Ontology] entity types:', entityTypes.length, '| edge types:', edgeTypes.length)
       console.log('[Ontology] files:', Array.isArray(payload.files) ? payload.files.length : 0)
+      
+      // Show per-file extraction warnings without blocking the workflow.
+      uploadWarnings.value = Array.isArray(payload.failed_files)
+        ? payload.failed_files
+        : []
       
       // upload data
       clearPendingUpload()
@@ -1550,6 +1572,23 @@ onUnmounted(() => {
 
 .detail-section {
   margin-bottom: 12px;
+}
+
+.upload-warning-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.upload-warning-item {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #8a4b00;
+  background: #fff7e6;
+  border-left: 3px solid #f0a020;
+  padding: 8px 10px;
+  word-break: break-word;
 }
 
 .detail-summary {

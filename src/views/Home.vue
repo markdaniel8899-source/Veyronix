@@ -145,7 +145,6 @@
                   ref="fileInput"
                   type="file"
                   multiple
-                  accept=".pdf,.md,.txt"
                   @change="handleFileSelect"
                   style="display: none"
                   :disabled="loading"
@@ -272,12 +271,9 @@ const handleDrop = (e) => {
   addFiles(droppedFiles)
 }
 
-// add file
+// add file - every file type is accepted; the backend extracts readable text
 const addFiles = (newFiles) => {
-  const validFiles = newFiles.filter(file => {
-    const ext = file.name.split('.').pop().toLowerCase()
-    return ['pdf', 'md', 'txt'].includes(ext)
-  })
+  const validFiles = newFiles.filter(file => file && file.name)
   files.value.push(...validFiles)
 }
 
