@@ -227,6 +227,17 @@
                   </div>
                 </template>
 
+                <!-- DISLIKE_POST: Dislike post -->
+                <template v-if="action.action_type === 'DISLIKE_POST'">
+                  <div class="like-info">
+                    <svg class="icon-small" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path></svg>
+                    <span class="like-label">Disliked @{{ action.action_args?.post_author_name || 'User' }}'s post</span>
+                  </div>
+                  <div v-if="action.action_args?.post_content" class="liked-content">
+                    "{{ truncateContent(action.action_args.post_content, 120) }}"
+                  </div>
+                </template>
+
                 <!-- CREATE_COMMENT: Post Comment -->
                 <template v-if="action.action_type === 'CREATE_COMMENT'">
                   <div v-if="action.action_args?.content" class="content-text">
@@ -717,6 +728,7 @@ const getActionTypeLabel = (type) => {
     'CREATE_POST': 'POST',
     'REPOST': 'REPOST',
     'LIKE_POST': 'LIKE',
+    'DISLIKE_POST': 'DISLIKE',
     'CREATE_COMMENT': 'COMMENT',
     'LIKE_COMMENT': 'LIKE',
     'DO_NOTHING': 'IDLE',
@@ -734,6 +746,7 @@ const getActionTypeClass = (type) => {
     'CREATE_POST': 'badge-post',
     'REPOST': 'badge-action',
     'LIKE_POST': 'badge-action',
+    'DISLIKE_POST': 'badge-action',
     'CREATE_COMMENT': 'badge-comment',
     'LIKE_COMMENT': 'badge-action',
     'QUOTE_POST': 'badge-post',
